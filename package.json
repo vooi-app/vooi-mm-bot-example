@@ -1,0 +1,25 @@
+{
+  "name": "vooi-mm-bot",
+  "description": "Open-source delta-neutral market-making bot for the VOOI Perps API",
+  "license": "MIT",
+  "module": "mm-bot.ts",
+  "type": "module",
+  "scripts": {
+    "start": "bun mm-bot.ts",
+    "regen-client": "openapi-ts",
+    "check": "bun check-config.ts",
+    "markets": "bun list-markets.ts"
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "^0.92.3",
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@hey-api/client-fetch": "^0.13.1",
+    "decimal.js-light": "^2.5.1",
+    "dotenv": "^16.4.5"
+  }
+}
