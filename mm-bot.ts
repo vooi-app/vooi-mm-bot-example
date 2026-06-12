@@ -218,23 +218,44 @@ async function cancelOrders(types: Set<string>): Promise<void> {
   }
 }
 
+/**
+ * How far through the book a force-close order crosses to guarantee a fill, as a
+ * fraction of the live price (0.03 = 3%). A reduce-only limit at this price fills
+ * against the best resting orders (so the actual slippage is the real spread, not
+ * the full buffer) — but a non-crossing close (no price, or the passive spread
+ * price) can rest forever and leave a leg open. Override with FORCE_CLOSE_CROSS.
+ */
+const FORCE_CLOSE_CROSS = new Decimal(process.env.FORCE_CLOSE_CROSS?.trim() || "0.03");
+
 async function forceCloseOpenPositions(scope: string, maxAttempts: number): Promise<void> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const { data: positions } = await exchangeControllerGetPositions(EXCHANGES_QUERY);
     const openPos = (positions ?? []).filter((p) => isOurs(p) && p.size !== "0");
     if (openPos.length === 0) return;
     if (attempt > 0) console.log(`[${scope}] Retry #${attempt}: ${openPos.length} position(s) still open`);
+    // Fresh prices so the crossing limit is anchored to the current market, not startup.
+    const { data: liveMarkets } = await exchangeControllerGetMarkets(EXCHANGES_QUERY);
     for (const pos of openPos) {
       const leg = legForItem(pos)!;
       const posSize = new Decimal(pos.size);
       const closeSide: Side = posSize.gt(0) ? "sell" : "buy";
-      console.log(`[close] Force-closing ${pos.exchange}: ${closeSide} ${posSize.abs()} ${leg.symbol}`);
+      // Marketable limit: cross the book so the order actually fills. A long closes
+      // by selling below mid; a short closes by buying above mid. A plain reduce-only
+      // order with no price rests at the top of book and can leave the leg open.
+      const mkt = (liveMarkets ?? []).find((m) => m.exchange === pos.exchange && m.baseSymbol === pos.baseSymbol) ?? leg.market;
+      const ref = new Decimal(mkt.price);
+      const crossPrice = (closeSide === "sell" ? ref.mul(new Decimal(1).minus(FORCE_CLOSE_CROSS)) : ref.mul(new Decimal(1).plus(FORCE_CLOSE_CROSS))).toDecimalPlaces(
+        mkt.priceDecimals,
+        closeSide === "sell" ? Decimal.ROUND_DOWN : Decimal.ROUND_UP,
+      );
+      console.log(`[close] Force-closing ${pos.exchange}: ${closeSide} ${posSize.abs()} ${leg.symbol} @${crossPrice} (marketable)`);
       const body = {
         exchange: pos.exchange,
         symbol: leg.symbol,
         asset: leg.asset,
         side: closeSide,
         size: posSize.abs().toString(),
+        price: crossPrice.toString(),
         reduceOnly: true,
         ...exchangeExtras(pos.exchange),
       };
@@ -666,12 +687,27 @@ async function runCycle(): Promise<void> {
     await cancelAllAndClose();
   }
 
-  let balanceAfter = ZERO;
-  for (let i = 0; i < 5; i++) {
+  // Measure PnL only once positions are actually flat. sumBalances uses
+  // availableMargin, so an open leg's locked margin would otherwise read as a loss
+  // (this is what produced the bogus large negative PnL when a close got stuck).
+  let balanceAfter = balanceBefore;
+  let flat = false;
+  for (let i = 0; i < 20; i++) {
     await sleep(1000);
+    const { data: posCheck } = await exchangeControllerGetPositions(EXCHANGES_QUERY);
+    const stillOpen = (posCheck ?? []).filter((p) => isOurs(p) && p.size !== "0");
+    if (stillOpen.length === 0) {
+      await sleep(1000); // let freed margin settle before reading the balance
+      const { data: accountsAfter } = await exchangeControllerGetAccounts(EXCHANGES_QUERY);
+      balanceAfter = sumBalances(accountsAfter);
+      flat = true;
+      break;
+    }
     const { data: accountsAfter } = await exchangeControllerGetAccounts(EXCHANGES_QUERY);
     balanceAfter = sumBalances(accountsAfter);
-    if (balanceAfter.gt(balanceBefore.mul(0.5))) break;
+  }
+  if (!flat) {
+    console.warn("[pnl] positions not flat after wait — reported PnL may be inaccurate; check manually");
   }
 
   const cyclePnl = balanceAfter.minus(balanceBefore);
