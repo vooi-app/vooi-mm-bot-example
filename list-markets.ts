@@ -13,7 +13,7 @@ import { config as loadEnv } from "dotenv";
 import { client } from "./src/client/client.gen";
 import { exchangeControllerGetMarkets } from "./src/client/sdk.gen";
 
-loadEnv({ path: join(import.meta.dir, ".env"), override: true });
+loadEnv({ path: join(import.meta.dirname ?? import.meta.dir, ".env"), override: true });
 
 const token = process.env.BEARER_TOKEN;
 if (!token) {
@@ -21,7 +21,7 @@ if (!token) {
   process.exit(1);
 }
 const baseUrl = process.env.BASE_URL ?? "https://perps-api.vooi.io";
-client.setConfig({ baseUrl, auth: () => token });
+client.setConfig({ baseUrl, headers: { Authorization: `Bearer ${token}` } });
 
 const { data: markets, error, response } = await exchangeControllerGetMarkets({});
 if (error || !markets) {

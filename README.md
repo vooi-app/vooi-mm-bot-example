@@ -32,17 +32,17 @@ On `SIGINT`/`SIGTERM` the bot cancels all of its orders and force-closes its pos
 
 1. **Generate an API token** — go to [ultra.vooi.io/api-tokens](https://ultra.vooi.io/api-tokens) and create a token. This goes into `BEARER_TOKEN` in your `.env`.
 2. **Fund your account** — deposit on at least two venues you plan to use (e.g. Hyperliquid + Lighter). Both legs need margin.
-3. **Install Bun** — the bot runs on Bun ≥ 1.0, not Node: `curl -fsSL https://bun.sh/install | bash`
+3. **Install Node** — the bot runs on [Node.js](https://nodejs.org) ≥ 18 (the npm scripts run TypeScript via [`tsx`](https://tsx.is)).
 
 ## Quickstart
 
-Requires [Bun](https://bun.com) ≥ 1.0.
+Requires [Node.js](https://nodejs.org) ≥ 18.
 
 ```bash
 cp .env.example .env   # fill in BEARER_TOKEN and pick exchanges/asset
 
-bun install
-bun start
+npm install
+npm start
 ```
 
 Minimal `.env`:
@@ -60,9 +60,9 @@ Start small: low `BALANCE_RATIO`, explicit `PRIMARY_LEVERAGE`/`HEDGE_LEVERAGE`, 
 Two read-only helpers (no orders are ever placed by them):
 
 ```bash
-bun run check          # preflight: validates token, venues, market resolution, balances
-bun run markets        # what venues + builder prefixes your account can reach
-bun run markets spcx   # find an asset across all venues (symbols, market ids, prices)
+npm run check          # preflight: validates token, venues, market resolution, balances
+npm run markets        # what venues + builder prefixes your account can reach
+npm run markets spcx   # find an asset across all venues (symbols, market ids, prices)
 ```
 
 ## Venue names: accepted values
@@ -79,7 +79,7 @@ bun run markets spcx   # find an asset across all venues (symbols, market ids, p
 | `tradexyz` / `xyz` / `trade.xyz` | builder venue | trade.xyz — Hyperliquid markets prefixed `xyz:` |
 | `hyperliquid:<prefix>` | builder venue (generic) | any HIP-3 deployer by its prefix, e.g. `hyperliquid:km` |
 
-The authoritative list of API exchanges is whatever `GET /exchange/markets` returns for your account (new exchanges added by VOOI work here without code changes). The authoritative list of builder prefixes is whatever appears before `:` in Hyperliquid baseSymbols. Both are printed by `bun run markets`.
+The authoritative list of API exchanges is whatever `GET /exchange/markets` returns for your account (new exchanges added by VOOI work here without code changes). The authoritative list of builder prefixes is whatever appears before `:` in Hyperliquid baseSymbols. Both are printed by `npm run markets`.
 
 ## Builder venues on Hyperliquid (Kinetiq, trade.xyz, …)
 
@@ -87,7 +87,7 @@ Some "exchanges" are not separate venues in the VOOI API — they are **HIP-3 bu
 
 The bot understands these as first-class venue names (see the table above), so `HEDGE_EXCHANGE=kinetic` just works: orders go to Hyperliquid, but only `km:*` markets are considered. With a builder venue selected, `ALIAS=SPCX` resolves to `<prefix>:SPCX` on that venue (e.g. `xyz:SPCX` for `tradexyz`) — you don't have to spell out the prefix in the alias or symbol. Both legs may even sit on different builder venues of the same underlying exchange (the bot tracks each leg by its own market and warns that they share one margin account).
 
-To see which builder prefixes exist right now and how many markets each has, run `bun run markets` — it lists every prefix with the ready-to-paste venue name (`hyperliquid:km`, `hyperliquid:xyz`, …).
+To see which builder prefixes exist right now and how many markets each has, run `npm run markets` — it lists every prefix with the ready-to-paste venue name (`hyperliquid:km`, `hyperliquid:xyz`, …).
 
 ## Choosing markets: alias vs explicit symbols
 
@@ -103,7 +103,7 @@ PRIMARY_MARKET_ID=110076    # exact market id when one symbol has several market
 
 Where to look up symbols and market ids:
 
-- `bun run markets <fragment>` — searches all venues your account can reach and prints `exchange`, `baseSymbol`, `id`, price and leverage (e.g. `bun run markets spcx`, `bun run markets btc`);
+- `npm run markets <fragment>` — searches all venues your account can reach and prints `exchange`, `baseSymbol`, `id`, price and leverage (e.g. `npm run markets spcx`, `npm run markets btc`);
 - the raw API: `GET /exchange/markets` with your bearer token — `baseSymbol` and `id` fields are exactly what `*_SYMBOL` / `*_MARKET_ID` expect;
 - the VOOI app market list shows the same symbols.
 
@@ -146,8 +146,8 @@ All settings live in `.env` (see [.env.example](.env.example) for the full annot
 
 ```
 mm-bot.ts          # entry point: leverage setup, the 5-phase cycle loop, shutdown
-check-config.ts    # `bun run check` — read-only preflight of the .env config
-list-markets.ts    # `bun run markets [fragment]` — read-only venue/market discovery
+check-config.ts    # `npm run check` — read-only preflight of the .env config
+list-markets.ts    # `npm run markets [fragment]` — read-only venue/market discovery
 src/config.ts      # all env parsing; leg config (primary/hedge); virtual venue map; broker extras
 src/markets.ts     # alias/symbol/market-id → market resolution; per-exchange `asset` field
 src/sse.ts         # SSE stream (prices, orders, positions) with reconnect/backoff
@@ -158,7 +158,7 @@ src/client/        # generated VOOI API client (@hey-api/openapi-ts) — do not 
 
 Notes for agents working on this code:
 
-- The exchange is intentionally a plain string end-to-end; only the generated client narrows it. Order/leverage bodies are cast `as never` at the call site so new exchanges work without regenerating. To refresh the client anyway: `bun run regen-client` (see `openapi-ts.config.ts`).
+- The exchange is intentionally a plain string end-to-end; only the generated client narrows it. Order/leverage bodies are cast `as never` at the call site so new exchanges work without regenerating. To refresh the client anyway: `npm run regen-client` (see `openapi-ts.config.ts`).
 - Builder venues (Kinetiq, trade.xyz) are *virtual*: `VIRTUAL_EXCHANGES` in `src/config.ts` maps friendly names to `{exchange: "hyperliquid", prefix}`, and `resolveMarket()` narrows candidates to `prefix:*` baseSymbols. To support a new well-known deployer, add one line to that map; users can always reach it earlier via `hyperliquid:<prefix>`.
 - Because two legs can share one API exchange, never key bot state by exchange alone: orders/positions are matched to a leg by `exchange + baseSymbol` (`legForItem`), and leverage is tracked per leg role.
 - Aster quirk: the `asset` field in order/leverage requests is the market **id** (e.g. `BTCUSDT`); everywhere else it is the `baseSymbol`. This is encapsulated in `assetFor()` — keep it that way.

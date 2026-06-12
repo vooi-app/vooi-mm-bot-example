@@ -6,7 +6,7 @@ import { BASE_URL, EXCHANGES } from "./config";
 /** Append-only JSON lines: full request/response on API errors (default next to the project root). */
 const API_ERROR_DEBUG_LOG = process.env.API_ERROR_DEBUG_LOG?.trim()?.startsWith("/")
   ? process.env.API_ERROR_DEBUG_LOG.trim()
-  : join(import.meta.dir, "..", process.env.API_ERROR_DEBUG_LOG?.trim() ?? "api-error-debug.jsonl");
+  : join(import.meta.dirname ?? import.meta.dir, "..", process.env.API_ERROR_DEBUG_LOG?.trim() ?? "api-error-debug.jsonl");
 
 export function apiBaseUrl(): string {
   return BASE_URL.replace(/\/$/, "");

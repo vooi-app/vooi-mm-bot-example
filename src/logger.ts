@@ -4,7 +4,7 @@ import { inspect } from "node:util";
 
 /** Append-only log next to the project root (`BOT_LOG`, default `bot.log`). Every console line gets an ISO timestamp. */
 const BOT_LOG = process.env.BOT_LOG ?? "bot.log";
-const LOG_PATH = join(import.meta.dir, "..", BOT_LOG);
+const LOG_PATH = join(import.meta.dirname ?? import.meta.dir, "..", BOT_LOG);
 /** Set `BOT_LOG_MIRROR=0` to stop echoing to the terminal (file only). */
 const LOG_MIRROR = process.env.BOT_LOG_MIRROR !== "0";
 

@@ -60,7 +60,7 @@ import { ExchangeUpdates, waitForFirstPrice } from "./src/sse";
 
 installLogger();
 
-client.setConfig({ baseUrl: BASE_URL, auth: () => BEARER_TOKEN });
+client.setConfig({ baseUrl: BASE_URL, headers: { Authorization: `Bearer ${BEARER_TOKEN}` } });
 
 type Side = "buy" | "sell";
 
@@ -240,8 +240,7 @@ async function forceCloseOpenPositions(scope: string, maxAttempts: number): Prom
       const posSize = new Decimal(pos.size);
       const closeSide: Side = posSize.gt(0) ? "sell" : "buy";
       // Marketable limit: cross the book so the order actually fills. A long closes
-      // by selling below mid; a short closes by buying above mid. A plain reduce-only
-      // order with no price rests at the top of book and can leave the leg open.
+      // by selling below mid; a short closes by buying above mid.
       const mkt = (liveMarkets ?? []).find((m) => m.exchange === pos.exchange && m.baseSymbol === pos.baseSymbol) ?? leg.market;
       const ref = new Decimal(mkt.price);
       const crossPrice = (closeSide === "sell" ? ref.mul(new Decimal(1).minus(FORCE_CLOSE_CROSS)) : ref.mul(new Decimal(1).plus(FORCE_CLOSE_CROSS))).toDecimalPlaces(
@@ -438,10 +437,14 @@ async function runCycle(): Promise<void> {
   const hedgeLeverage = leverageByRole.get("hedge") ?? hedge.market.maxLeverage;
 
   // Size: min of what each exchange can afford with its leverage and balance ratio.
+  // The primary leg rests BOTH a buy and a sell quote at once, so each cycle needs
+  // margin for two primary positions simultaneously — budget half the primary
+  // allowance per side, or the second quote is rejected for insufficient margin.
   const primaryMaxSize = new Decimal(primaryAccount.availableMargin)
     .mul(BALANCE_RATIO)
     .mul(primaryLeverage)
     .div(price)
+    .div(2)
     .toDecimalPlaces(primary.market.baseDecimals, Decimal.ROUND_DOWN);
   const hedgeMaxSize = new Decimal(hedgeAccount.availableMargin)
     .mul(BALANCE_RATIO)
@@ -498,7 +501,8 @@ async function runCycle(): Promise<void> {
     return;
   }
 
-  const marginNeed = estNotional.div(primaryLeverage).mul(MARGIN_PREFLIGHT_BUFFER);
+  // ×2: the primary rests a buy and a sell at once, so both need margin up front.
+  const marginNeed = estNotional.mul(2).div(primaryLeverage).mul(MARGIN_PREFLIGHT_BUFFER);
   const avail = new Decimal(primaryAccFresh.availableMargin);
   if (avail.lt(marginNeed)) {
     console.log(

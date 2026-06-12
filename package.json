@@ -5,14 +5,15 @@
   "module": "mm-bot.ts",
   "type": "module",
   "scripts": {
-    "start": "bun mm-bot.ts",
+    "start": "tsx mm-bot.ts",
     "regen-client": "openapi-ts",
-    "check": "bun check-config.ts",
-    "markets": "bun list-markets.ts"
+    "check": "tsx check-config.ts",
+    "markets": "tsx list-markets.ts"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "^0.92.3",
-    "@types/bun": "latest"
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0"
   },
   "peerDependencies": {
     "typescript": "^5"

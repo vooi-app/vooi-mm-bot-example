@@ -4,7 +4,7 @@ import { config as loadEnv } from "dotenv";
 import Decimal from "decimal.js-light";
 
 /** `.env` next to the project root wins over inherited shell env. */
-loadEnv({ path: join(import.meta.dir, "..", ".env"), override: true });
+loadEnv({ path: join(import.meta.dirname ?? import.meta.dir, "..", ".env"), override: true });
 
 function requireEnv(name: string): string {
   const value = process.env[name];

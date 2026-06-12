@@ -11,7 +11,7 @@ import { exchangeControllerGetAccounts, exchangeControllerGetMarkets } from "./s
 import { ALIAS, BASE_URL, BEARER_TOKEN, EXCHANGES, LEGS } from "./src/config";
 import { assetFor, resolveMarket } from "./src/markets";
 
-client.setConfig({ baseUrl: BASE_URL, auth: () => BEARER_TOKEN });
+client.setConfig({ baseUrl: BASE_URL, headers: { Authorization: `Bearer ${BEARER_TOKEN}` } });
 
 let failed = false;
 
