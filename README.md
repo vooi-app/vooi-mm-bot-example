@@ -1,18 +1,20 @@
+# vooi-mm-bot
+
+Delta-neutral market-making bot for perpetual futures on Hyperliquid, Lighter, Aster, Extended, trade.xyz, and Kinetiq — built on the [VOOI Perps API](https://perps-api.vooi.io).
+
 > **Disclaimer**
 >
 > These examples are provided for educational purposes only. They are not financial advice and do not guarantee profit.
 >
-> The current bot examples were generated with AI-assisted development and tested before publication. They demonstrate how VOOI Ultra users can quickly prototype trading bots and agentic trading workflows using VOOI Perps API access available through VOOI Ultra.
+> They demonstrate how VOOI Ultra users can quickly prototype trading bots and agentic trading workflows using VOOI Perps API access available through VOOI Ultra.
 >
 > Testing does not make the bots risk-free. Trading bots can place real orders and interact with real funds. Review the code, configuration, strategy, and risk controls before running any bot with live capital.
 
----
+## What this is
 
-# vooi-mm-bot
+You pick two venues and an asset. The bot quotes a passive spread on one exchange, waits for a fill, then instantly hedges on the other — net exposure stays ~zero. Works with any pair of venues your VOOI account can reach: Hyperliquid, Lighter, Aster, Extended, Kinetiq, trade.xyz, or any HIP-3 builder deployment.
 
-Open-source delta-neutral market-making bot on top of the [VOOI Perps API](https://perps-api.vooi.io). It quotes a passive spread on one exchange and hedges every fill with a market order on another — you pick the exchanges and the asset in `.env`.
-
-Works with any pair of exchanges available through your VOOI account (e.g. primary on **Extended**, hedge on **Kinetic**; or primary on **Aster**, hedge on **Lighter** — any combination).
+Useful if you want to capture spread on RWA perps (NVDA, SPCX, gold, S&P 500) or crypto perps across venues without running directional risk.
 
 ## How it works
 
@@ -25,6 +27,12 @@ Each cycle:
 5. **Settle** — as soon as either side closes (or `CLOSE_TIMEOUT_MS` expires), force-close whatever remains at market and print the cycle PnL.
 
 On `SIGINT`/`SIGTERM` the bot cancels all of its orders and force-closes its positions before exiting. On startup it refuses to run if a leftover position exists on a configured market.
+
+## Before you start
+
+1. **Generate an API token** — go to [ultra.vooi.io/api-tokens](https://ultra.vooi.io/api-tokens) and create a token. This goes into `BEARER_TOKEN` in your `.env`.
+2. **Fund your account** — deposit on at least two venues you plan to use (e.g. Hyperliquid + Lighter). Both legs need margin.
+3. **Install Bun** — the bot runs on Bun ≥ 1.0, not Node: `curl -fsSL https://bun.sh/install | bash`
 
 ## Quickstart
 
@@ -158,11 +166,22 @@ Notes for agents working on this code:
 - Anything the bot owns is identified by `exchange + baseSymbol` (`isOurs()`); it never touches positions or orders on other markets of the same account.
 - The cycle loop is deliberately conservative: any error → cancel everything, close everything, sleep, retry.
 
+## Related repos
+
+- [**vooi-funding-bot-example**](https://github.com/vooi-app/vooi-funding-bot-example) — Delta-neutral funding arbitrage bot. Long one venue, short another, capture the spread.
+- [**vooi-signals-bot-example**](https://github.com/vooi-app/vooi-signals-bot-example) — Telegram signals → LLM parser → VOOI API trade execution.
+- [**vooi-mcp**](https://github.com/vooi-app/mcp) — MCP server for running perp strategies through Claude, Cursor, or any AI agent.
+
+## Links
+
+- API docs: [perps-api.vooi.io/docs](https://perps-api.vooi.io/docs)
+- Get API access: [ultra.vooi.io/api-tokens](https://ultra.vooi.io/api-tokens)
+- VOOI Ultra: [ultra.vooi.io](https://ultra.vooi.io)
+- X: [@vooi_io](https://x.com/vooi_io)
+
 ## Safety
 
-- The bot trades with real funds and can lose money (spread too tight vs fees, slippage on force-closes, one leg failing). Test with a small balance first.
-- Both legs must be funded; sizing is the minimum of what each side affords.
-- Keep your `BEARER_TOKEN` secret — it controls your trading account. `.env`, logs and debug dumps are gitignored; never commit them.
+The bot trades with real funds and can lose money — spread too tight vs fees, slippage on force-closes, one leg failing. Test with a small balance first. Both legs must be funded; sizing is the minimum of what each side affords. Keep your `BEARER_TOKEN` secret — it controls your trading account. `.env`, logs and debug dumps are gitignored; never commit them.
 
 ## License
 
